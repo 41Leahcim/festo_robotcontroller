@@ -1,4 +1,5 @@
 use crate::controller::Controller;
+use ethercrab::error::Error as EthercrabError;
 use std::fmt::Debug;
 
 pub mod servo;
@@ -7,7 +8,7 @@ pub enum ResetError {
     ResetFailed(usize),
     ResetFailedWithoutWarning(usize),
     ResetFailedWithoutFault(usize),
-    DeviceNotFound(usize, ethercrab::error::Error),
+    DeviceNotFound(usize, EthercrabError),
 }
 
 impl ResetError {
@@ -88,6 +89,15 @@ impl Debug for SetModeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Failed to set device {} to mode {:?}", self.0, self.1)
     }
+}
+
+/// The error status of the device
+#[derive(Debug, PartialEq, Eq)]
+pub enum DeviceError {
+    Fault,
+    Warning,
+    FaultAndWarning,
+    Ok,
 }
 
 enum ControlBit {
@@ -207,7 +217,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         self.controller.cycle().await;
 
         let mut retries = 1000;
-        while self.get_error() != 0 && retries > 0 {
+        while self.get_error() != DeviceError::Ok && retries > 0 {
             retries -= 1;
             self.set_bit(ControlBit::FaultReset as u8, 0);
             if self.controller.verbose() {
@@ -233,17 +243,19 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         }
     }
 
-    fn set_bit(&mut self, mut bit: u8, byte: u8) {
+    fn set_bit(&mut self, mut bit: u8, byte: u8) -> u8 {
         let Ok(mut sub_device) = self
             .controller
             .group()
             .subdevice(self.controller.main_device(), self.id)
         else {
-            return;
+            return 0;
         };
         let byte = (usize::from(byte) + usize::from(bit / 8)) % sub_device.outputs_raw().len();
         bit %= 8;
-        sub_device.outputs_raw_mut()[byte] |= 1 << bit;
+        let outputs = sub_device.outputs_raw_mut();
+        outputs[byte] |= 1 << bit;
+        outputs[byte]
     }
 
     fn unset_bit(&mut self, mut bit: u8, byte: u8) -> u8 {
@@ -299,12 +311,19 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         u16::from(byte1) << 8 | u16::from(byte0)
     }
 
-    pub fn get_error(&self) -> i8 {
-        -i8::from(self.get_bit(StatusWordBit::Fault as u8, 0))
-            - i8::from(self.get_bit(StatusWordBit::Warning as u8, 0))
+    pub fn get_error(&self) -> DeviceError {
+        match (
+            self.get_bit(StatusWordBit::Fault as u8, 0),
+            self.get_bit(StatusWordBit::Warning as u8, 0),
+        ) {
+            (false, false) => DeviceError::Ok,
+            (false, true) => DeviceError::Warning,
+            (true, false) => DeviceError::Fault,
+            (true, true) => DeviceError::FaultAndWarning,
+        }
     }
 
-    pub fn get_16(&self, byte: u8) -> Result<u16, ethercrab::error::Error> {
+    pub fn get_16(&self, byte: u8) -> Result<u16, EthercrabError> {
         let sub_device = self
             .controller
             .group()

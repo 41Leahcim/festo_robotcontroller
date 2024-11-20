@@ -1,13 +1,12 @@
-use std::fmt::Debug;
-
-use crate::{controller::Controller, device::ControlBit};
-
 use super::{Device, EnableError, OperationMode, SetModeError, StatusWordBit};
+use crate::{controller::Controller, device::ControlBit};
+use ethercrab::error::Error as EthercrabError;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub enum StartupError {
     FailedToInitialize,
-    NodevicesFound,
+    NoDevicesFound,
 }
 
 pub enum HomingError {
@@ -44,7 +43,7 @@ impl Debug for JoggingError {
 
 pub enum MovementError {
     DriveNotEnabled(usize),
-    Ethercat(ethercrab::error::Error),
+    Ethercat(EthercrabError),
     SetMode(SetModeError),
 }
 
@@ -61,10 +60,10 @@ impl Debug for MovementError {
 }
 
 pub enum FullControlMovementError {
-    WritingAccelerationFailed(usize, ethercrab::error::Error),
-    WritingDecelerationFailed(usize, ethercrab::error::Error),
+    WritingAccelerationFailed(usize, EthercrabError),
+    WritingDecelerationFailed(usize, EthercrabError),
     MovementFailed(MovementError),
-    DeviceNotFound(ethercrab::error::Error),
+    DeviceNotFound(EthercrabError),
 }
 
 impl Debug for FullControlMovementError {
@@ -111,7 +110,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         Ok(Self(Device::new(controller, device_number).await?))
     }
 
-    pub fn get_position(&self) -> Result<u32, ethercrab::error::Error> {
+    pub fn get_position(&self) -> Result<u32, EthercrabError> {
         const POSITION_ACTUAL_VALUE_ADDRESS: usize = 3;
         let sub_device = self
             .0
@@ -299,7 +298,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
             .map_err(FullControlMovementError::MovementFailed)
     }
 
-    fn set_position(&self, target: i32, byte: u8) -> Result<(), ethercrab::error::Error> {
+    fn set_position(&self, target: i32, byte: u8) -> Result<(), EthercrabError> {
         let mut sub_device = self
             .0
             .controller
@@ -314,7 +313,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         Ok(())
     }
 
-    fn set_profile_velocity(&self, velocity: u32, byte: u8) -> Result<(), ethercrab::error::Error> {
+    fn set_profile_velocity(&self, velocity: u32, byte: u8) -> Result<(), EthercrabError> {
         let mut sub_device = self
             .0
             .controller

@@ -5,6 +5,7 @@ use std::{
 };
 
 use ethercrab::{
+    error::Error as EthercrabError,
     std::{ethercat_now, tx_rx_task},
     MainDevice, MainDeviceConfig, PduStorage, SubDeviceGroup,
 };
@@ -12,7 +13,7 @@ use ethercrab::{
 pub enum ControllerError {
     NoSocketConnection(String),
     FailedToStartMaster,
-    Ethercat(ethercrab::error::Error),
+    Ethercat(EthercrabError),
 }
 
 impl Debug for ControllerError {
@@ -22,17 +23,6 @@ impl Debug for ControllerError {
             Self::FailedToStartMaster => write!(f, "Failed to start master"),
             Self::Ethercat(error) => write!(f, "{error}")
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct Timeout;
-
-pub struct MapCia402Error(u16);
-
-impl Debug for MapCia402Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Check PDO mapping on device {}", self.0)
     }
 }
 
