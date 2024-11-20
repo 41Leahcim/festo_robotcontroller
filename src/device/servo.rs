@@ -110,7 +110,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         Ok(Self(Device::new(controller, device_number).await?))
     }
 
-    pub fn get_position(&self) -> Result<u32, EthercrabError> {
+    pub fn get_position(&mut self) -> Result<u32, EthercrabError> {
         const POSITION_ACTUAL_VALUE_ADDRESS: usize = 3;
         let sub_device = self
             .0
@@ -239,9 +239,9 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         }
         while !self.0.get_bit(StatusWordBit::MotionComplete as u8, 0) {
             if self.0.controller.verbose() {
+                let id = self.0.id;
                 print!(
-                    "Move device {} {movement:?} : {target} {}\r",
-                    self.0.id,
+                    "Move device {id} {movement:?} : {target} {}\r",
                     self.get_position().unwrap()
                 );
             }
@@ -298,7 +298,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
             .map_err(FullControlMovementError::MovementFailed)
     }
 
-    fn set_position(&self, target: i32, byte: u8) -> Result<(), EthercrabError> {
+    fn set_position(&mut self, target: i32, byte: u8) -> Result<(), EthercrabError> {
         let mut sub_device = self
             .0
             .controller
@@ -313,7 +313,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         Ok(())
     }
 
-    fn set_profile_velocity(&self, velocity: u32, byte: u8) -> Result<(), EthercrabError> {
+    fn set_profile_velocity(&mut self, velocity: u32, byte: u8) -> Result<(), EthercrabError> {
         let mut sub_device = self
             .0
             .controller

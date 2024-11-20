@@ -274,7 +274,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         outputs[byte]
     }
 
-    fn get_bit(&self, mut bit: u8, byte: u8) -> bool {
+    fn get_bit(&mut self, mut bit: u8, byte: u8) -> bool {
         let Ok(sub_device) = self
             .controller
             .group()
@@ -287,7 +287,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         (sub_device.inputs_raw()[byte] & (1 << bit)) != 0
     }
 
-    fn ready_state(&self) -> bool {
+    fn ready_state(&mut self) -> bool {
         self.get_bit(StatusWordBit::OperationEnabled as u8, 0)
     }
 
@@ -311,7 +311,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         u16::from(byte1) << 8 | u16::from(byte0)
     }
 
-    pub fn get_error(&self) -> DeviceError {
+    pub fn get_error(&mut self) -> DeviceError {
         match (
             self.get_bit(StatusWordBit::Fault as u8, 0),
             self.get_bit(StatusWordBit::Warning as u8, 0),
@@ -323,7 +323,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         }
     }
 
-    pub fn get_16(&self, byte: u8) -> Result<u16, EthercrabError> {
+    pub fn get_16(&mut self, byte: u8) -> Result<u16, EthercrabError> {
         let sub_device = self
             .controller
             .group()
