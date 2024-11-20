@@ -169,21 +169,21 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
 
     pub async fn jog_positive(&mut self) -> Result<(), JoggingError> {
         if self.0.controller.verbose() {
-            println!("Begin jog in positive direction");
+            log::info!("Begin jog in positive direction");
         }
         self.jog(JoggingDirection::Positive).await
     }
 
     pub async fn jog_negative(&mut self) -> Result<(), JoggingError> {
         if self.0.controller.verbose() {
-            println!("Begin jog in negative direction");
+            log::info!("Begin jog in negative direction");
         }
         self.jog(JoggingDirection::Negative).await
     }
 
     pub async fn jog_stop(&mut self) {
         if self.0.controller.verbose() {
-            println!("Stopping jog movement");
+            log::info!("Stopping jog movement");
         }
         if !self.0.ready_state() {
             return;
@@ -213,7 +213,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         movement: MovementMode,
     ) -> Result<(), MovementError> {
         if self.0.controller.verbose() {
-            println!(
+            log::info!(
                 "Starting {movement:?} movement to position {target} of device {}",
                 self.0.id
             );
@@ -240,8 +240,8 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
         while !self.0.get_bit(StatusWordBit::MotionComplete as u8, 0) {
             if self.0.controller.verbose() {
                 let id = self.0.id;
-                print!(
-                    "Move device {id} {movement:?} : {target} {}\r",
+                log::info!(
+                    "Move device {id} {movement:?} : {target} {}",
                     self.get_position().unwrap()
                 );
             }
@@ -249,7 +249,7 @@ impl<'device, 'controller: 'device> Servo<'device, 'controller> {
             self.0.controller.cycle().await;
         }
         if self.0.controller.verbose() {
-            println!(" completed");
+            log::info!("Movement completed");
         }
         Ok(())
     }

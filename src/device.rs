@@ -164,7 +164,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         device_number: usize,
     ) -> Result<Self, EnableError> {
         if controller.verbose() {
-            println!("Start enabling drive {device_number}");
+            log::info!("Start enabling drive {device_number}");
         }
         let mut result = Self {
             id: device_number,
@@ -188,7 +188,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
             && result.get_bit(StatusWordBit::OperationEnabled as u8, 0)
         {
             if controller.verbose() {
-                println!("Enable drive {device_number} successful");
+                log::info!("Enable drive {device_number} successful");
             }
             Ok(result)
         } else if timeout == 0 {
@@ -200,7 +200,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
 
     pub async fn reset(&mut self) -> Result<(), ResetError> {
         if self.controller.verbose() {
-            println!("Resetting device number: {}", self.id);
+            log::info!("Resetting device number: {}", self.id);
         }
         {
             let mut sub_device = self
@@ -212,7 +212,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         }
 
         if self.controller.verbose() {
-            println!("Wait for empty frame device number: {}", self.id);
+            log::info!("Wait for empty frame device number: {}", self.id);
         }
         self.controller.cycle().await;
 
@@ -221,7 +221,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
             retries -= 1;
             self.set_bit(ControlBit::FaultReset as u8, 0);
             if self.controller.verbose() {
-                println!("Waiting on fault device number: {}", self.id);
+                log::info!("Waiting on fault device number: {}", self.id);
             }
             self.controller.cycle().await;
             self.unset_bit(ControlBit::FaultReset as u8, 0);
@@ -233,7 +233,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         ) {
             (false, false) => {
                 if self.controller.verbose() {
-                    println!("Ressetting device number: {} done", self.id);
+                    log::info!("Ressetting device number: {} done", self.id);
                 }
                 Ok(())
             }
@@ -369,7 +369,7 @@ impl<'device, 'controller: 'device> Device<'device, 'controller> {
         }
         self.unset_control();
         if self.controller.verbose() {
-            println!("Arrived in mode {mode:?}");
+            log::info!("Arrived in mode {mode:?}");
         }
         Ok(())
     }

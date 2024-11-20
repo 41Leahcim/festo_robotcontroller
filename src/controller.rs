@@ -65,7 +65,7 @@ impl Controller<'_> {
         verbose: bool,
     ) -> Result<Self, ControllerError> {
         if verbose {
-            println!("Starting Ethercat Master");
+            log::info!("Starting Ethercat Master");
         }
 
         // Initialize SOEM, bind socket to `interface_name`
@@ -79,7 +79,13 @@ impl Controller<'_> {
             },
             MainDeviceConfig::default(),
         ));
+
+        #[cfg(feature = "tokio")]
         tokio::spawn(tx_rx_task(interface_name, tx, rx).expect("Spawn TX/RX task"));
+        #[cfg(feature = "smol")]
+        smol::spawn(tx_rx_task(interface_name, tx, rx).expect("Spawn TX/RX task")).detach();
+        #[cfg(not(any(feature = "tokio", feature = "smol")))]
+        const _: () = panic!("Either tokio or smol needs to be used as async runtime");
 
         let mut group = main_device
             .init_single_group::<MAX_DEVICES, PDI_LENGTH>(ethercat_now)
@@ -87,7 +93,7 @@ impl Controller<'_> {
             .expect("Failed to initialize");
 
         if verbose {
-            println!("Context initialization on {interface_name:?} succeeded.");
+            log::info!("Context initialization on {interface_name:?} succeeded.");
         }
 
         for sub_device in group.iter(&main_device) {
@@ -109,7 +115,7 @@ impl Controller<'_> {
                 0x60410010, 0x60610008, 0x60640020, 0x606c0020, 0x60770010, 0x21940520, 0x00000008,
             ];
             if verbose {
-                println!(
+                log::info!(
                     "Doing Cia402 configuration for device {}",
                     sub_device.identity()
                 );
@@ -151,7 +157,7 @@ impl Controller<'_> {
                 .map_err(ControllerError::Ethercat)?;
 
             if verbose {
-                println!("Done mapping drive");
+                log::info!("Done mapping drive");
             }
         }
 
@@ -178,7 +184,11 @@ impl Controller<'_> {
                 self.cycle_time
             );
         } else {
-            tokio::time::sleep(self.cycle_time - delta).await;
+            let sleep_duration = self.cycle_time - delta;
+            #[cfg(feature = "tokio")]
+            tokio::time::sleep(sleep_duration).await;
+            #[cfg(feature = "smol")]
+            smol::unblock(move || std::thread::sleep(sleep_duration)).await;
         }
     }
 }

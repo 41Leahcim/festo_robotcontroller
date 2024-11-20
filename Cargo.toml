@@ -3,6 +3,16 @@ name = "festo_robotcontroller"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["tokio"]
+tokio = ["dep:tokio"]
+smol = ["dep:smol"]
+
 [dependencies]
 ethercrab = { git = "https://github.com/ethercrab-rs/ethercrab.git", rev = "643eb0d" }
-tokio = { version = "1", features = ["full"] }
+log = "0.4.22"
+smol = { version = "2.0.2", optional = true }
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "time",
+], optional = true }
