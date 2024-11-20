@@ -1,0 +1,8 @@
+[package]
+name = "festo_robotcontroller"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ethercrab = { git = "https://github.com/ethercrab-rs/ethercrab.git", rev = "643eb0d" }
+tokio = { version = "1", features = ["full"] }
