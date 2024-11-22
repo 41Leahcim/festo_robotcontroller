@@ -6,8 +6,8 @@ use crate::{
     controller::Controller,
     device::{ControlBit, MappedPdo},
 };
+use core::fmt::{self, Debug, Formatter};
 use ethercrab::error::Error as EthercrabError;
-use std::fmt::Debug;
 
 /// An error returned while moving the servo to it's default (home) position
 pub enum HomingError {
@@ -19,7 +19,7 @@ pub enum HomingError {
 }
 
 impl Debug for HomingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::DeviceDisabled(device) => {
                 write!(f, "Homing not possible, device {device} is disabled")
@@ -39,7 +39,7 @@ pub enum JoggingError {
 }
 
 impl Debug for JoggingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::DeviceDisabled(device) => {
                 write!(f, "Jogging not possible device {device} is disabled")
@@ -63,7 +63,7 @@ pub enum MovementError {
 }
 
 impl Debug for MovementError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::DriveDisabled(device) => {
                 write!(f, "Drive {device} is disabled, movement not possible")
@@ -90,7 +90,7 @@ pub enum FullControlMovementError {
 }
 
 impl Debug for FullControlMovementError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::WritingAccelerationFailed(device, error) => {
                 write!(
@@ -209,9 +209,9 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             MappedPdo::ControlStatusWord,
         ) && !always
         {
-            println!("device already homed");
+            log::info!("device already homed");
         } else {
-            println!("device {} starting homing", self.0.id);
+            log::info!("device {} starting homing", self.0.id);
             self.0.unset_control();
             self.0
                 .set_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);

@@ -1,11 +1,11 @@
 //! This module contains everything related to the controller.
 //! The controller initializes the network and allowes devices to communicate and be created.
 
-use std::{
-    fmt::Debug,
-    io,
-    time::{Duration, Instant},
+use core::{
+    fmt::{self, Debug, Formatter},
+    time::Duration,
 };
+use std::{io, time::Instant};
 
 use ethercrab::{
     error::Error as EthercrabError,
@@ -32,7 +32,7 @@ pub enum ControllerError {
 }
 
 impl Debug for ControllerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ethercat(error) => write!(f, "{error}"),
             Self::AnotherControllerExists => write!(f, "Only one controller can exist at any time"),
@@ -129,7 +129,7 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
         ];
 
         for sub_device in group.iter(main_device) {
-            println!("Configuring device {}", sub_device.identity());
+            log::info!("Configuring device {}", sub_device.identity());
             // Check if name or eeprom-id is correct for all types of CMMT
             if !matches!(sub_device.name(), "CMMT-AS" | "CMMT-ST")
                 && !matches!(sub_device.identity().product_id, 0x7B_5A25 | 0x7B_1A95)
@@ -264,7 +264,7 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
         let _ = self.group.tx_rx_sync_system_time(&self.main_device).await;
         let delta = start.elapsed();
         if delta > self.cycle_time {
-            println!(
+            log::info!(
                 "System too slow for cycle time {:?} sending takes {delta:?}",
                 self.cycle_time
             );

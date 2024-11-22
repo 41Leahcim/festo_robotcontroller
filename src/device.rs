@@ -3,8 +3,8 @@
 //! It's also the base struct for most types of subdevices.
 
 use crate::controller::Controller;
+use core::fmt::{self, Debug, Formatter};
 use ethercrab::error::Error as EthercrabError;
-use std::fmt::Debug;
 
 pub mod servo;
 
@@ -38,7 +38,7 @@ impl ResetError {
 }
 
 impl Debug for ResetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ResetFailed(device_number) => {
                 write!(f, "Resetting device number {device_number} failed")
@@ -71,7 +71,7 @@ pub enum EnableError {
 }
 
 impl Debug for EnableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ResetFailed(reset_error) => write!(
                 f,
@@ -126,7 +126,7 @@ enum OperationMode {
 pub struct SetModeError(usize, OperationMode);
 
 impl Debug for SetModeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Failed to set device {} to mode {:?}", self.0, self.1)
     }
 }
