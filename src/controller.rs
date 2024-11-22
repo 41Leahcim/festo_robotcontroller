@@ -1,6 +1,9 @@
+//! This module contains everything related to the controller.
+//! The controller initializes the network and allowes devices to communicate and be created.
+
 use std::{
     fmt::Debug,
-    sync::Arc,
+    io,
     time::{Duration, Instant},
 };
 
@@ -10,110 +13,130 @@ use ethercrab::{
     MainDevice, MainDeviceConfig, PduStorage, SubDeviceGroup,
 };
 
+/// An error occured while creating a controller
 pub enum ControllerError {
-    NoSocketConnection(String),
-    FailedToStartMaster,
+    /// Somehting wen wrong while trying to communicate over Ethercat
     Ethercat(EthercrabError),
+
+    /// There is already an active `Controller` for the `PduStorage`
+    AnotherControllerExists,
+
+    /// Failed to spawn a task to send and receive data
+    FailedToSpawnUpdateTask(io::Error),
+
+    /// Failed to initialize the devicegroup for this controller
+    FailedToInitializeGroup(EthercrabError),
+
+    /// Failed to make the devicegroup operational
+    FailedToMakeGroupOperational(EthercrabError),
 }
 
 impl Debug for ControllerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self{
-            Self::NoSocketConnection(interface) => write!(f, "No socket connection on {interface}\nExecute as root and verify your network adapter name"),
-            Self::FailedToStartMaster => write!(f, "Failed to start master"),
-            Self::Ethercat(error) => write!(f, "{error}")
+        match self {
+            Self::Ethercat(error) => write!(f, "{error}"),
+            Self::AnotherControllerExists => write!(f, "Only one controller can exist at any time"),
+            Self::FailedToSpawnUpdateTask(error) => {
+                write!(f, "Failed to spawn update task: {error}")
+            }
+            Self::FailedToInitializeGroup(error) => {
+                write!(f, "Failed to initialize group: {error}")
+            }
+            Self::FailedToMakeGroupOperational(error) => {
+                write!(f, "Failed to make group operational: {error}")
+            }
         }
     }
 }
 
-const MAX_FRAMES: usize = 16;
-const MAX_PDU_DATA: usize = 1100;
-const MAX_DEVICES: usize = 16;
-const PDI_LENGTH: usize = 64;
-
-static PDU_STORAGE: PduStorage<MAX_FRAMES, MAX_PDU_DATA> = PduStorage::new();
-
-pub struct Controller<'main_device> {
+/// The controller struct, only 1 is allowed to exist at any time.
+/// Recommended constants:
+/// - `MAX_DEVICES`: 16
+/// - `PDI_LENGTH`: 64
+pub struct Controller<'main_device, const MAX_DEVICES: usize, const PDI_LENGTH: usize> {
+    /// The duration of a cycle
     cycle_time: Duration,
+
+    /// Whether to log info messages
     verbose: bool,
-    main_device: Arc<MainDevice<'main_device>>,
+
+    /// The main device
+    main_device: MainDevice<'main_device>,
+
+    /// The group of connected devices
     group: SubDeviceGroup<MAX_DEVICES, PDI_LENGTH, ethercrab::subdevice_group::Op>,
 }
 
-impl Controller<'_> {
+impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVICES, PDI_LENGTH> {
+    /// Returns the cycle time specified at construction time.
+    /// Updates will always take atleast this amount of time.
     pub const fn cycle_time(&self) -> Duration {
         self.cycle_time
     }
 
+    /// Returns whether information is logged.
     pub const fn verbose(&self) -> bool {
         self.verbose
     }
 
-    pub fn main_device(&self) -> &MainDevice {
+    /// Returns a reference to the main device, used for communicating with slaves
+    pub(super) const fn main_device(&self) -> &MainDevice {
         &self.main_device
     }
 
+    /// Returns a reference to the group containing all devices to communicate with
     pub const fn group(
         &self,
     ) -> &SubDeviceGroup<MAX_DEVICES, PDI_LENGTH, ethercrab::subdevice_group::Op> {
         &self.group
     }
 
-    pub async fn new(
-        interface_name: &str,
+    /// Configures the subdevices
+    async fn configure_devices(
+        group: &mut SubDeviceGroup<MAX_DEVICES, PDI_LENGTH>,
+        main_device: &MainDevice<'_>,
         cycle_time: Duration,
         verbose: bool,
-    ) -> Result<Self, ControllerError> {
-        if verbose {
-            log::info!("Starting Ethercat Master");
-        }
+    ) -> Result<(), ControllerError> {
+        /// The index to write the output PDO's to
+        const PDO_OUTPUT_INDEX: u16 = 0x1600;
 
-        // Initialize SOEM, bind socket to `interface_name`
-        let (tx, rx, pdu_loop) = PDU_STORAGE.try_split().expect("Can only split once");
-        let main_device = Arc::new(MainDevice::new(
-            pdu_loop,
-            ethercrab::Timeouts {
-                wait_loop_delay: Duration::from_millis(2),
-                mailbox_response: Duration::from_millis(1_000),
-                ..Default::default()
-            },
-            MainDeviceConfig::default(),
-        ));
+        /// The values for the output PDO's
+        const PDO_OUTPUT: [u32; 9] = [
+            0x6040_0010,
+            0x6060_0008,
+            0x607a_0020,
+            0x6081_0020,
+            0x60ff_0020,
+            0x6071_0010,
+            0x60b1_0020,
+            0x60b2_0010,
+            0x0000_0008,
+        ];
 
-        #[cfg(feature = "tokio")]
-        tokio::spawn(tx_rx_task(interface_name, tx, rx).expect("Spawn TX/RX task"));
-        #[cfg(feature = "smol")]
-        smol::spawn(tx_rx_task(interface_name, tx, rx).expect("Spawn TX/RX task")).detach();
-        #[cfg(not(any(feature = "tokio", feature = "smol")))]
-        const _: () = panic!("Either tokio or smol needs to be used as async runtime");
+        /// The index to write the input PDO's to
+        const PDO_INPUT_INDEX: u16 = 0x1A00;
 
-        let mut group = main_device
-            .init_single_group::<MAX_DEVICES, PDI_LENGTH>(ethercat_now)
-            .await
-            .expect("Failed to initialize");
+        /// The values for the input PDO's
+        const PDO_INPUT: [u32; 7] = [
+            0x6041_0010,
+            0x6061_0008,
+            0x6064_0020,
+            0x606c_0020,
+            0x6077_0010,
+            0x2194_0520,
+            0x0000_0008,
+        ];
 
-        if verbose {
-            log::info!("Context initialization on {interface_name:?} succeeded.");
-        }
-
-        for sub_device in group.iter(&main_device) {
+        for sub_device in group.iter(main_device) {
             println!("Configuring device {}", sub_device.identity());
             // Check if name or eeprom-id is correct for all types of CMMT
             if !matches!(sub_device.name(), "CMMT-AS" | "CMMT-ST")
-                && !matches!(sub_device.identity().product_id, 0x7B5A25 | 0x7B1A95)
+                && !matches!(sub_device.identity().product_id, 0x7B_5A25 | 0x7B_1A95)
             {
                 continue;
             }
-            // Set output PDOs
-            const PDO_OUTPUT_INDEX: u16 = 0x1600;
-            const PDO_OUTPUT: [u32; 9] = [
-                0x60400010, 0x60600008, 0x607a0020, 0x60810020, 0x60ff0020, 0x60710010, 0x60b10020,
-                0x60b20010, 0x00000008,
-            ];
-            const PDO_INPUT_INDEX: u16 = 0x1A00;
-            const PDO_INPUT: [u32; 7] = [
-                0x60410010, 0x60610008, 0x60640020, 0x606c0020, 0x60770010, 0x21940520, 0x00000008,
-            ];
+
             if verbose {
                 log::info!(
                     "Doing Cia402 configuration for device {}",
@@ -160,8 +183,70 @@ impl Controller<'_> {
                 log::info!("Done mapping drive");
             }
         }
+        Ok(())
+    }
 
-        let group = group.into_op(&main_device).await.unwrap();
+    /// Creates the controller struct, used to create and communicate with devices.
+    /// Only one controller can exist at any time.
+    ///
+    /// Recommanded values for constants:
+    /// - `MAX_FRAMES`: 16
+    /// - `MAX_PDU_DATA`: 1100
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - There already is a controller
+    /// - The group couldn't be initialized
+    /// - A slave couldn't be configured
+    /// - The group couldn't be made operational
+    ///
+    /// # Returns
+    /// The `controller` struct or an error
+    pub async fn new<const MAX_FRAMES: usize, const MAX_PDU_DATA: usize>(
+        interface_name: &str,
+        cycle_time: Duration,
+        pdu_storage: &'static PduStorage<MAX_FRAMES, MAX_PDU_DATA>,
+        verbose: bool,
+    ) -> Result<Self, ControllerError> {
+        if verbose {
+            log::info!("Starting Ethercat Master");
+        }
+
+        // Initialize SOEM, bind socket to `interface_name`
+        let (tx, rx, pdu_loop) = pdu_storage
+            .try_split()
+            .map_err(|()| ControllerError::AnotherControllerExists)?;
+        let main_device = MainDevice::new(
+            pdu_loop,
+            ethercrab::Timeouts {
+                wait_loop_delay: Duration::from_millis(2),
+                mailbox_response: Duration::from_millis(1_000),
+                ..Default::default()
+            },
+            MainDeviceConfig::default(),
+        );
+
+        let update_task =
+            tx_rx_task(interface_name, tx, rx).map_err(ControllerError::FailedToSpawnUpdateTask)?;
+        #[cfg(feature = "tokio")]
+        tokio::spawn(update_task);
+        #[cfg(feature = "smol")]
+        smol::spawn(update_task).detach();
+
+        let mut group = main_device
+            .init_single_group::<MAX_DEVICES, PDI_LENGTH>(ethercat_now)
+            .await
+            .map_err(ControllerError::FailedToInitializeGroup)?;
+
+        if verbose {
+            log::info!("Context initialization on {interface_name:?} succeeded.");
+        }
+
+        Self::configure_devices(&mut group, &main_device, cycle_time, verbose).await?;
+
+        let group = Box::pin(group.into_op(&main_device))
+            .await
+            .map_err(ControllerError::FailedToMakeGroupOperational)?;
 
         Ok(Self {
             cycle_time,
