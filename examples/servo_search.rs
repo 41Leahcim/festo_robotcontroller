@@ -10,13 +10,15 @@ fn main() {
         .enable_all()
         .build()
         .unwrap();
-    runtime.block_on(async {
-        let mut controller: Controller<'_, 16, 64> =
-            Controller::new("eth0", Duration::from_millis(20), &PDU_STORAGE, true)
-                .await
-                .unwrap();
-        for sub_device in controller.device_iter() {
-            println!("{sub_device:?}");
-        }
-    });
+    let mut controller: Controller<'_, 16, 64> = runtime
+        .block_on(Controller::new(
+            "eth0",
+            Duration::from_millis(20),
+            &PDU_STORAGE,
+            true,
+        ))
+        .unwrap();
+    for sub_device in controller.device_iter() {
+        println!("{sub_device:?}");
+    }
 }
