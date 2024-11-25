@@ -8,8 +8,9 @@ use core::{
 use std::{io, time::Instant};
 
 use ethercrab::{
-    error::Error as EthercrabError, std::tx_rx_task, MainDevice, MainDeviceConfig, PduStorage,
-    SubDeviceGroup,
+    error::Error as EthercrabError,
+    std::{ethercat_now, tx_rx_task},
+    MainDevice, MainDeviceConfig, PduStorage, SubDeviceGroup,
 };
 
 /// An error occured while creating a controller
@@ -63,10 +64,7 @@ pub struct Controller<'main_device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     main_device: MainDevice<'main_device>,
 
     /// The group of connected devices
-    #[cfg(not(test))]
     group: SubDeviceGroup<MAX_DEVICES, PDI_LENGTH, ethercrab::subdevice_group::Op>,
-    #[cfg(test)]
-    group: tests::Group,
 }
 
 impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVICES, PDI_LENGTH> {
@@ -82,25 +80,32 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
     }
 
     /// Returns a reference to the main device, used for communicating with slaves
-    pub(super) const fn main_device(&self) -> &MainDevice {
+    pub const fn main_device(&self) -> &MainDevice {
         &self.main_device
     }
 
     /// Returns a reference to the group containing all devices to communicate with
-    #[cfg(not(test))]
     pub const fn group(
         &self,
     ) -> &SubDeviceGroup<MAX_DEVICES, PDI_LENGTH, ethercrab::subdevice_group::Op> {
         &self.group
     }
 
-    #[cfg(test)]
-    pub const fn group(&self) -> &tests::Group {
-        &self.group
+    /// Returns an iterator over the connected devices.
+    pub fn device_iter(
+        &mut self,
+    ) -> ethercrab::GroupSubDeviceIterator<
+        '_,
+        '_,
+        MAX_DEVICES,
+        PDI_LENGTH,
+        ethercrab::subdevice_group::Op,
+        ethercrab::subdevice_group::NoDc,
+    > {
+        self.group.iter(&self.main_device)
     }
 
     /// Configures the subdevices
-    #[cfg_attr(test, allow(dead_code))]
     async fn configure_devices(
         group: &mut SubDeviceGroup<MAX_DEVICES, PDI_LENGTH>,
         main_device: &MainDevice<'_>,
@@ -211,7 +216,6 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
     ///
     /// # Returns
     /// The `controller` struct or an error
-    #[cfg_attr(test, allow(clippy::unused_async))]
     pub async fn new<const MAX_FRAMES: usize, const MAX_PDU_DATA: usize>(
         interface_name: &str,
         cycle_time: Duration,
@@ -243,26 +247,20 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
         #[cfg(feature = "smol")]
         smol::spawn(update_task).detach();
 
-        #[cfg(not(test))]
-        let group = {
-            use ethercrab::std::ethercat_now;
-            let mut group = main_device
-                .init_single_group::<MAX_DEVICES, PDI_LENGTH>(ethercat_now)
-                .await
-                .map_err(ControllerError::FailedToInitializeGroup)?;
+        let mut group = main_device
+            .init_single_group::<MAX_DEVICES, PDI_LENGTH>(ethercat_now)
+            .await
+            .map_err(ControllerError::FailedToInitializeGroup)?;
 
-            if verbose {
-                log::info!("Context initialization on {interface_name:?} succeeded.");
-            }
+        if verbose {
+            log::info!("Context initialization on {interface_name:?} succeeded.");
+        }
 
-            Self::configure_devices(&mut group, &main_device, cycle_time, verbose).await?;
+        Self::configure_devices(&mut group, &main_device, cycle_time, verbose).await?;
 
-            Box::pin(group.into_op(&main_device))
-                .await
-                .map_err(ControllerError::FailedToMakeGroupOperational)?
-        };
-        #[cfg(test)]
-        let group = tests::Group::default();
+        let group = Box::pin(group.into_op(&main_device))
+            .await
+            .map_err(ControllerError::FailedToMakeGroupOperational)?;
 
         Ok(Self {
             cycle_time,
@@ -290,75 +288,6 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
             tokio::time::sleep(sleep_duration).await;
             #[cfg(feature = "smol")]
             smol::unblock(move || std::thread::sleep(sleep_duration)).await;
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::{Mutex, MutexGuard};
-
-    use ethercrab::MainDevice;
-
-    #[derive(Debug)]
-    pub struct SubDevice {
-        inputs: [u8; 256],
-        outputs: [u8; 256],
-    }
-
-    impl Default for SubDevice {
-        fn default() -> Self {
-            Self {
-                inputs: [0; 256],
-                outputs: [0; 256],
-            }
-        }
-    }
-
-    pub struct DeviceRef<'device>(MutexGuard<'device, SubDevice>);
-
-    impl DeviceRef<'_> {
-        pub fn inputs_raw(&self) -> &[u8; 256] {
-            &self.0.inputs
-        }
-
-        pub fn outputs_raw(&self) -> &[u8; 256] {
-            &self.0.outputs
-        }
-
-        pub fn outputs_raw_mut(&mut self) -> &mut [u8; 256] {
-            &mut self.0.outputs
-        }
-
-        #[expect(clippy::unused_async)]
-        pub async fn sdo_write<T: Send>(
-            &self,
-            _index: u16,
-            _sub_index: u8,
-            _value: T,
-        ) -> Result<(), ethercrab::error::Error> {
-            Ok(())
-        }
-    }
-
-    #[derive(Debug, Default)]
-    pub struct Group {
-        devices: [Mutex<SubDevice>; 12],
-    }
-
-    impl Group {
-        #[expect(clippy::unused_async)]
-        pub async fn tx_rx_sync_system_time(&self, _main_device: &MainDevice<'_>) -> u8 {
-            0
-        }
-
-        #[expect(clippy::unnecessary_wraps)]
-        pub fn subdevice(
-            &self,
-            _main_device: &MainDevice<'_>,
-            index: usize,
-        ) -> Result<DeviceRef, ethercrab::error::Error> {
-            Ok(DeviceRef(self.devices[index].lock().unwrap()))
         }
     }
 }
