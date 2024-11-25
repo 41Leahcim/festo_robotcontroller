@@ -517,6 +517,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     ///
     /// # Returns
     /// Returns the 2 read bytes or an error
+    #[cfg_attr(test, expect(clippy::significant_drop_tightening))]
     pub fn get_16(&mut self, byte: u8) -> Result<u16, EthercrabError> {
         let sub_device = self
             .controller

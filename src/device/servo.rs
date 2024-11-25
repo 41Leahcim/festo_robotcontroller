@@ -409,6 +409,10 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// - The device isn't enabled
     /// - The position mode couldn't be set to set mode
     /// - The position couldn't be set
+    #[cfg_attr(
+        test,
+        expect(clippy::future_not_send, clippy::significant_drop_tightening)
+    )]
     pub async fn move_position_velocity_acceleration(
         &mut self,
         target: i32,
@@ -448,12 +452,12 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     )]
     /// Set the servo position to the requested value.
     fn set_position(&mut self, target: i32, byte: u8) -> Result<(), EthercrabError> {
-        let mut sub_device = self
-            .0
+        self.0
             .controller
             .group()
-            .subdevice(self.0.controller.main_device(), self.0.id)?;
-        sub_device.outputs_raw_mut()[usize::from(byte)..].copy_from_slice(&target.to_le_bytes());
+            .subdevice(self.0.controller.main_device(), self.0.id)?
+            .outputs_raw_mut()[usize::from(byte)..]
+            .copy_from_slice(&target.to_le_bytes());
         Ok(())
     }
 
@@ -470,12 +474,12 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         velocity: u32,
         byte: MappedPdo,
     ) -> Result<(), EthercrabError> {
-        let mut sub_device = self
-            .0
+        self.0
             .controller
             .group()
-            .subdevice(self.0.controller.main_device(), self.0.id)?;
-        sub_device.outputs_raw_mut()[byte as usize..].copy_from_slice(&velocity.to_le_bytes());
+            .subdevice(self.0.controller.main_device(), self.0.id)?
+            .outputs_raw_mut()[byte as usize..]
+            .copy_from_slice(&velocity.to_le_bytes());
         Ok(())
     }
 }
