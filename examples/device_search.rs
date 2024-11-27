@@ -9,7 +9,7 @@ use festo_robotcontroller::controller::Controller;
 
 static PDU_STORAGE: PduStorage<16, 1100> = PduStorage::new();
 
-#[derive(Debug, clap::Parser)]
+#[derive(Debug, Parser)]
 pub struct Args {
     /// The interface to communicate over
     interface: String,
@@ -50,7 +50,7 @@ fn main() {
                 println!("Device type: {description}",);
             } else {
                 // Otherwise, display the partial name
-                println!("Device name: {}", sub_device.name());
+                println!("Model name: {}", sub_device.name());
             }
 
             // Display the identity of the device (vendor, product, revision, serial numbers)
