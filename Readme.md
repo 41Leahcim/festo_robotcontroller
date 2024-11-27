@@ -9,4 +9,4 @@ This library currently only works on platforms with an operating system, as it u
 - MacOS
 
 # Required tools
-- Rust (latest stable version)
+- Rust (version 1.81.0 and newer)

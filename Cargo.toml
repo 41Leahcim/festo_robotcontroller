@@ -8,6 +8,9 @@ default = ["tokio"]
 tokio = ["dep:tokio"]
 smol = ["dep:smol"]
 
+[dev-dependencies]
+clap = { version = "4", features = ["derive"] }
+
 [dependencies]
 ethercrab = { git = "https://github.com/ethercrab-rs/ethercrab.git", rev = "643eb0d" }
 log = "0.4.22"
