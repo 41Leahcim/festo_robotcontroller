@@ -188,7 +188,7 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
                 .map_err(ControllerError::InputPdo)?;
 
             // Configure the servo controller
-            /*sub_device
+            sub_device
                 .sdo_write(0x1C12, 1, 0x1600u16)
                 .await
                 .map_err(ControllerError::Ethercat)?;
@@ -203,7 +203,7 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
             sub_device
                 .sdo_write(0x1C13, 0, 1u8)
                 .await
-                .map_err(ControllerError::Ethercat)?;*/
+                .map_err(ControllerError::Ethercat)?;
 
             if verbose {
                 log::info!("Done mapping drive");
