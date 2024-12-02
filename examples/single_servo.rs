@@ -39,7 +39,7 @@ async fn find_device<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
         let device = controller
             .group()
             .subdevice(controller.main_device(), device_number)
-            .unwrap();
+            .expect("Failed to take control of device");
         assert!(none_or_equal(args.alias_address, device.alias_address()));
         assert!(none_or_equal(
             args.configured_address,
@@ -72,7 +72,7 @@ async fn perform_movement<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
         // Read the position to move to, it's still possible to stop
         println!("Enter position: ");
         buffer.clear();
-        io::stdin().read_line(buffer).unwrap();
+        io::stdin().read_line(buffer).expect("Failed to read input");
         let Ok(position) = buffer.trim().parse::<i32>() else {
             eprintln!("Invalid position, returning to mode selection!");
             break;
@@ -81,7 +81,9 @@ async fn perform_movement<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
         // Request the movement method
         println!("Enter 0 for absolute, enter 1 for relative:");
         buffer.clear();
-        io::stdin().read_line(buffer).unwrap();
+        io::stdin()
+            .read_line(buffer)
+            .expect("Failed  to read input");
         let Some(movement) = buffer
             .trim()
             .parse::<u8>()
@@ -102,7 +104,7 @@ async fn perform_movement<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
         // Request the velocity to move at, move at normal velocity on failure
         println!("Enter velocity: ");
         buffer.clear();
-        io::stdin().read_line(buffer).unwrap();
+        io::stdin().read_line(buffer).expect("Failed to read input");
         let Ok(velocity) = buffer.trim().parse::<u32>() else {
             println!("Failed to read velocity, using default.");
             if let Err(error) = servo.move_position(position, movement).await {
@@ -190,7 +192,7 @@ fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .unwrap();
+        .expect("Failed to create tokio runtime");
 
     runtime.block_on(async {
         // Create a new controller
@@ -201,13 +203,17 @@ fn main() {
             true,
         )
         .await
-        .unwrap();
+        .expect("Failed to initialize controller");
 
         // Find the first device matching the requested properties
-        let servo_number = find_device(&mut controller, args).await.unwrap();
+        let servo_number = find_device(&mut controller, args)
+            .await
+            .expect("Failed to find device");
 
         // Treat the found device as a servo
-        let mut servo = Servo::new(&controller, servo_number).await.unwrap();
+        let mut servo = Servo::new(&controller, servo_number)
+            .await
+            .expect("Failed to initialize device");
 
         // Create an input buffer
         let mut buffer = String::new();
@@ -221,7 +227,9 @@ fn main() {
             println!(" 4. Move");
             println!("Enter the number for the movement for the servo to make:");
             buffer.clear();
-            io::stdin().read_line(&mut buffer).unwrap();
+            io::stdin()
+                .read_line(&mut buffer)
+                .expect("Failed to read input");
 
             // Parse the movement code
             let Ok(selection) = buffer.trim().parse::<u8>() else {

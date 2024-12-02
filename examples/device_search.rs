@@ -23,7 +23,7 @@ fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .unwrap();
+        .expect("Failed to create tokio runtime");
 
     // Run the async code
     runtime.block_on(async {
@@ -35,7 +35,7 @@ fn main() {
             true,
         )
         .await
-        .unwrap();
+        .expect("Failed to initialize controller");
 
         // Iterate over the connected devices
         for (index, sub_device) in controller.device_iter().enumerate() {
