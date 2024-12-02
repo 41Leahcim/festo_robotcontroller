@@ -15,8 +15,17 @@ use ethercrab::{
 
 /// An error occured while creating a controller
 pub enum ControllerError {
-    /// Somehting wen wrong while trying to communicate over Ethercat
+    /// Somehting went wrong while trying to communicate over Ethercat
     Ethercat(EthercrabError),
+
+    /// Something went wrong while setting the cycle time
+    CycleTime(EthercrabError),
+
+    /// Something went wrong while setting the output pdo's
+    OutputPdo(EthercrabError),
+
+    /// Something went wrong while seeting the input pdo's
+    InputPdo(EthercrabError),
 
     /// There is already an active `Controller` for the `PduStorage`
     AnotherControllerExists,
@@ -34,7 +43,10 @@ pub enum ControllerError {
 impl Debug for ControllerError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ethercat(error) => write!(f, "{error}"),
+            Self::Ethercat(error) => write!(f, "Error while configuring network: {error}"),
+            Self::CycleTime(error) => write!(f, "Failed to set cycle time: {error}"),
+            Self::OutputPdo(error) => write!(f, "Failed to set output pdo's: {error}"),
+            Self::InputPdo(error) => write!(f, "Failed to set input pdo's: {error}"),
             Self::AnotherControllerExists => write!(f, "Only one controller can exist at any time"),
             Self::FailedToSpawnUpdateTask(error) => {
                 write!(f, "Failed to spawn update task: {error}")
@@ -161,19 +173,19 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
             sub_device
                 .sdo_write(0x212E, 2, cycle_time.as_secs_f32())
                 .await
-                .map_err(ControllerError::Ethercat)?;
+                .map_err(ControllerError::CycleTime)?;
 
             // Set output PDOs
             sub_device
                 .sdo_write_array(PDO_OUTPUT_INDEX, &PDO_OUTPUT)
                 .await
-                .map_err(ControllerError::Ethercat)?;
+                .map_err(ControllerError::OutputPdo)?;
 
             // Set input PDOs
             sub_device
                 .sdo_write_array(PDO_INPUT_INDEX, &PDO_INPUT)
                 .await
-                .map_err(ControllerError::Ethercat)?;
+                .map_err(ControllerError::InputPdo)?;
 
             // Configure the servo controller
             sub_device

@@ -24,7 +24,7 @@ impl Debug for HomingError {
             Self::DeviceDisabled(device) => {
                 write!(f, "Homing not possible, device {device} is disabled")
             }
-            Self::SetMode(error) => write!(f, "{error:?}"),
+            Self::SetMode(error) => write!(f, "Error while setting homing mode: {error:?}"),
         }
     }
 }
@@ -44,7 +44,7 @@ impl Debug for JoggingError {
             Self::DeviceDisabled(device) => {
                 write!(f, "Jogging not possible device {device} is disabled")
             }
-            Self::SetMode(error) => write!(f, "{error:?}"),
+            Self::SetMode(error) => write!(f, "Error while setting jogging mode: {error:?}"),
         }
     }
 }
@@ -69,7 +69,7 @@ impl Debug for MovementError {
                 write!(f, "Drive {device} is disabled, movement not possible")
             }
             Self::Ethercat(error) => write!(f, "{error}"),
-            Self::SetMode(error) => write!(f, "{error:?}"),
+            Self::SetMode(error) => write!(f, "Error while setting movement mode: {error:?}"),
         }
     }
 }
@@ -107,7 +107,7 @@ impl Debug for FullControlMovementError {
             Self::MovementFailed(move_drive_not_enabled) => {
                 write!(f, "{move_drive_not_enabled:?}")
             }
-            Self::DeviceInUse(error) => write!(f, "{error:?}"),
+            Self::DeviceInUse(error) => write!(f, "Device in use: {error:?}"),
         }
     }
 }
