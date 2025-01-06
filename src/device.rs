@@ -305,6 +305,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             );
             controller.cycle().await;
         }
+        eprintln!("Enable voltage is on");
         let mut timeout = 1_000_000;
         while !result.get_bit(
             StatusWordBit::OperationEnabled as u8,
@@ -319,6 +320,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             result.set_bit(ControlBit::SwitchOn as u8, MappedPdo::ControlStatusWord);
             controller.cycle().await;
         }
+        eprintln!("Device turned on");
         if result.get_bit(
             StatusWordBit::VoltageEnabled as u8,
             MappedPdo::ControlStatusWord,
