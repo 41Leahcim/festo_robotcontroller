@@ -296,7 +296,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         result.reset().await.map_err(EnableError::ResetFailed)?;
         let mut timeout = 1_000_000;
         while !result.get_bit(
-            ControlBit::EnableVoltage as u8,
+            StatusWordBit::VoltageEnabled as u8,
             MappedPdo::ControlStatusWord,
         ) && timeout > 0
         {
