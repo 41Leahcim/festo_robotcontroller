@@ -294,7 +294,10 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             controller,
         };
         result.reset().await.map_err(EnableError::ResetFailed)?;
-        while !result.get_bit(ControlBit::QuickStop as u8, MappedPdo::ControlStatusWord) {
+        while !result.get_bit(
+            ControlBit::EnableVoltage as u8,
+            MappedPdo::ControlStatusWord,
+        ) {
             result.set_bit(ControlBit::QuickStop as u8, MappedPdo::ControlStatusWord);
             result.set_bit(
                 ControlBit::EnableVoltage as u8,
@@ -488,7 +491,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         self.unset_bit(ControlBit::Control5 as u8, MappedPdo::ControlStatusWord);
         let byte0 = self.unset_bit(ControlBit::Control6 as u8, MappedPdo::ControlStatusWord);
         let byte1 = self.unset_bit(ControlBit::Control9 as u8, MappedPdo::ControlStatusWord);
-        u16::from(byte1) << 8 | u16::from(byte0)
+        (u16::from(byte1) << 8) | u16::from(byte0)
     }
 
     /// Reads the device error flags
