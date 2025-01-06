@@ -204,16 +204,19 @@ fn main() {
         )
         .await
         .expect("Failed to initialize controller");
+        eprintln!("Initialized controller");
 
         // Find the first device matching the requested properties
         let servo_number = find_device(&mut controller, args)
             .await
             .expect("Failed to find device");
+        eprintln!("Found device");
 
         // Treat the found device as a servo
         let mut servo = Servo::new(&controller, servo_number)
             .await
             .expect("Failed to initialize device");
+        eprintln!("Device can be used as servo");
 
         // Create an input buffer
         let mut buffer = String::new();
