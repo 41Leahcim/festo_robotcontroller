@@ -376,6 +376,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             self.controller.cycle().await;
             self.unset_bit(ControlBit::FaultReset as u8, MappedPdo::ControlStatusWord);
         }
+        eprintln!("Device OK");
 
         match (
             self.get_bit(StatusWordBit::Fault as u8, MappedPdo::ControlStatusWord),
