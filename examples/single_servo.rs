@@ -195,7 +195,7 @@ async fn perform_action<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
 fn main() {
     // Parse the arguments
     let args = Args::parse();
-    std_logger::Config::logfmt().init();
+    simple_logger::init().unwrap();
 
     // Create a new single threaded runtime
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -230,7 +230,7 @@ fn main() {
 
         servo.home(true).await.unwrap();
         servo
-            .move_position(1_000, MovementMode::Absolute)
+            .move_position(10_000, MovementMode::Absolute)
             .await
             .unwrap();
         servo
