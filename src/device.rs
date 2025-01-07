@@ -298,11 +298,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         while !(result.get_bit(
             StatusWordBit::VoltageEnabled as u8,
             MappedPdo::ControlStatusWord,
-        ) && result.get_bit(StatusWordBit::QuickStop as u8, MappedPdo::ControlStatusWord)
-            && result.get_bit(
-                StatusWordBit::SwitchedOn as u8,
-                MappedPdo::ControlStatusWord,
-            ))
+        ) && result.get_bit(StatusWordBit::QuickStop as u8, MappedPdo::ControlStatusWord))
             && timeout > 0
         {
             result.set_bit(ControlBit::QuickStop as u8, MappedPdo::ControlStatusWord);
@@ -310,13 +306,15 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
                 ControlBit::EnableVoltage as u8,
                 MappedPdo::ControlStatusWord,
             );
-            result.set_bit(ControlBit::SwitchOn as u8, MappedPdo::ControlStatusWord);
             controller.cycle().await;
             timeout -= 1;
         }
         eprintln!("Enable voltage is on");
         while !(result.get_bit(
             StatusWordBit::OperationEnabled as u8,
+            MappedPdo::ControlStatusWord,
+        ) && result.get_bit(
+            StatusWordBit::SwitchedOn as u8,
             MappedPdo::ControlStatusWord,
         )) && timeout > 0
         {
@@ -325,6 +323,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
                 ControlBit::EnableOperation as u8,
                 MappedPdo::ControlStatusWord,
             );
+            result.set_bit(ControlBit::SwitchOn as u8, MappedPdo::ControlStatusWord);
             controller.cycle().await;
         }
         eprintln!("Device turned on");
