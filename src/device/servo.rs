@@ -453,7 +453,9 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             .controller
             .group()
             .subdevice(self.0.controller.main_device(), self.0.id)?;
-        sub_device.outputs_raw_mut()[usize::from(byte)..].copy_from_slice(&target.to_le_bytes());
+        let byte = usize::from(byte);
+        sub_device.outputs_raw_mut()[byte..byte + size_of::<i32>()]
+            .copy_from_slice(&target.to_le_bytes());
         Ok(())
     }
 
