@@ -585,7 +585,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
                 .group()
                 .subdevice(self.controller.main_device(), self.id)
                 .is_ok_and(|sub_device| {
-                    sub_device.inputs_raw()[MappedPdo::OperationMode as usize] == mode as u8
+                    sub_device.inputs_raw()[MappedPdo::OperationMode as usize] != mode as u8
                 })
         {
             timeout -= 1;
