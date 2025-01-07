@@ -230,7 +230,7 @@ fn main() {
 
         servo.home(true).await.unwrap();
         servo
-            .move_position(100, MovementMode::Absolute)
+            .move_position(1_000, MovementMode::Absolute)
             .await
             .unwrap();
         servo
