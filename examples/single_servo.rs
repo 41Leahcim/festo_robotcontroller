@@ -1,4 +1,4 @@
-use std::{io, time::Duration};
+use std::{hint::spin_loop, io, time::Duration};
 
 use clap::Parser;
 use ethercrab::PduStorage;
@@ -217,6 +217,9 @@ fn main() {
             .await
             .expect("Failed to initialize device");
         eprintln!("Device can be used as servo");
+        loop {
+            spin_loop();
+        }
 
         // Create an input buffer
         let mut buffer = String::new();
