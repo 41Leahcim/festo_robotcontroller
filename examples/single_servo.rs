@@ -219,9 +219,6 @@ fn main() {
         eprintln!("Device can be used as servo");
 
         let _ = servo.home(true).await;
-        loop {
-            spin_loop();
-        }
 
         // Create an input buffer
         let mut buffer = String::new();
