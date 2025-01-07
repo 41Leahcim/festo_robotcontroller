@@ -10,6 +10,7 @@ smol = ["dep:smol"]
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
+std-logger = "0.5.4"
 
 [dependencies]
 ethercrab = { git = "https://github.com/ethercrab-rs/ethercrab.git", rev = "643eb0d" }

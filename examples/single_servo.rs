@@ -195,6 +195,7 @@ async fn perform_action<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
 fn main() {
     // Parse the arguments
     let args = Args::parse();
+    std_logger::Config::logfmt().init();
 
     // Create a new single threaded runtime
     let runtime = tokio::runtime::Builder::new_current_thread()
