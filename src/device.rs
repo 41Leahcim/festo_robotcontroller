@@ -327,9 +327,6 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             result.set_bit(ControlBit::SwitchOn as u8, MappedPdo::ControlStatusWord);
             controller.cycle().await;
         }
-        loop {
-            spin_loop();
-        }
         eprintln!("Device turned on");
         if result.get_bit(
             StatusWordBit::VoltageEnabled as u8,

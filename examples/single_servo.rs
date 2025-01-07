@@ -217,6 +217,8 @@ fn main() {
             .await
             .expect("Failed to initialize device");
         eprintln!("Device can be used as servo");
+
+        let _ = servo.home(true).await;
         loop {
             spin_loop();
         }
