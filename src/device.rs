@@ -295,10 +295,11 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         };
         result.reset().await.map_err(EnableError::ResetFailed)?;
         let mut timeout = 1_000_000;
-        while !result.get_bit(
+        while !(result.get_bit(
             StatusWordBit::VoltageEnabled as u8,
             MappedPdo::ControlStatusWord,
-        ) && timeout > 0
+        ) && result.get_bit(StatusWordBit::QuickStop as u8, MappedPdo::ControlStatusWord))
+            && timeout > 0
         {
             result.set_bit(ControlBit::QuickStop as u8, MappedPdo::ControlStatusWord);
             result.set_bit(
@@ -309,10 +310,13 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             timeout -= 1;
         }
         eprintln!("Enable voltage is on");
-        while !result.get_bit(
+        while !(result.get_bit(
             StatusWordBit::OperationEnabled as u8,
             MappedPdo::ControlStatusWord,
-        ) && timeout > 0
+        ) && result.get_bit(
+            StatusWordBit::SwitchedOn as u8,
+            MappedPdo::ControlStatusWord,
+        )) && timeout > 0
         {
             timeout -= 1;
             result.set_bit(
