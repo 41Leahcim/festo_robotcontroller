@@ -227,7 +227,18 @@ fn main() {
             .expect("Failed to initialize device");
         eprintln!("Device can be used as servo");
 
-        let _ = servo.home(true).await;
+        servo.home(true).await.unwrap();
+        servo
+            .move_position(100, MovementMode::Absolute)
+            .await
+            .unwrap();
+        servo
+            .move_position(0, MovementMode::Absolute)
+            .await
+            .unwrap();
+        loop {
+            spin_loop();
+        }
 
         // Create an input buffer
         let mut buffer = String::new();
