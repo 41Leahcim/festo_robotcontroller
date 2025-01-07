@@ -1,4 +1,12 @@
-use std::{hint::spin_loop, io, time::Duration};
+use std::{
+    hint::spin_loop,
+    io,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use clap::Parser;
 use ethercrab::PduStorage;
@@ -211,6 +219,7 @@ fn main() {
             .await
             .expect("Failed to find device");
         eprintln!("Found device");
+        let controller = Arc::new(controller);
 
         // Treat the found device as a servo
         let mut servo = Servo::new(&controller, servo_number)
@@ -232,9 +241,21 @@ fn main() {
             println!(" 4. Move");
             println!("Enter the number for the movement for the servo to make:");
             buffer.clear();
+            static WAITING_FOR_INPUT: AtomicBool = AtomicBool::new(false);
+            WAITING_FOR_INPUT.store(true, Ordering::Relaxed);
+            let task = tokio::spawn({
+                let controller = controller.clone();
+                async move {
+                    while WAITING_FOR_INPUT.load(Ordering::Relaxed) {
+                        controller.cycle().await;
+                    }
+                }
+            });
             io::stdin()
                 .read_line(&mut buffer)
                 .expect("Failed to read input");
+            WAITING_FOR_INPUT.store(false, Ordering::Relaxed);
+            task.await.unwrap();
 
             // Parse the movement code
             let Ok(selection) = buffer.trim().parse::<u8>() else {
