@@ -5,6 +5,7 @@
 use crate::controller::Controller;
 use core::fmt::{self, Debug, Formatter};
 use ethercrab::error::Error as EthercrabError;
+use servo::HomingError;
 use std::hint::spin_loop;
 
 pub mod servo;
@@ -339,6 +340,33 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         {
             if controller.verbose() {
                 log::info!("Enable drive {device_number} successful");
+            }
+            if !result.ready_state() {
+                return Err(HomingError::DeviceDisabled(result.id)).unwrap();
+            }
+            result
+                .set_mode(OperationMode::Homing)
+                .await
+                .map_err(HomingError::SetMode)
+                .unwrap();
+            let always = true;
+            if result.get_bit(
+                StatusWordBit::DriveHomed as u8,
+                MappedPdo::ControlStatusWord,
+            ) && !always
+            {
+                log::info!("device already homed");
+            } else {
+                log::info!("device {} starting homing", result.id);
+                result.unset_control();
+                result.set_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
+                while !result.get_bit(
+                    StatusWordBit::AckStartRefReached as u8,
+                    MappedPdo::ControlStatusWord,
+                ) {
+                    result.controller.cycle().await;
+                }
+                result.unset_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
             }
             Ok(result)
         } else if timeout == 0 {
