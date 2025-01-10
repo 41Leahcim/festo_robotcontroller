@@ -5,8 +5,6 @@
 use crate::controller::Controller;
 use core::fmt::{self, Debug, Formatter};
 use ethercrab::error::Error as EthercrabError;
-use servo::HomingError;
-use std::hint::spin_loop;
 
 pub mod servo;
 

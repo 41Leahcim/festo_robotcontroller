@@ -1,12 +1,4 @@
-use std::{
-    hint::spin_loop,
-    io,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{hint::spin_loop, sync::Arc, time::Duration};
 
 use clap::Parser;
 use ethercrab::PduStorage;
@@ -72,130 +64,9 @@ async fn find_device<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
     None
 }
 
-async fn perform_movement<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
-    servo: &mut Servo<'_, '_, MAX_DEVICES, PDI_LENGTH>,
-    buffer: &mut String,
-) {
-    loop {
-        // Read the position to move to, it's still possible to stop
-        println!("Enter position: ");
-        buffer.clear();
-        io::stdin().read_line(buffer).expect("Failed to read input");
-        let Ok(position) = buffer.trim().parse::<i32>() else {
-            eprintln!("Invalid position, returning to mode selection!");
-            break;
-        };
-
-        // Request the movement method
-        println!("Enter 0 for absolute, enter 1 for relative:");
-        buffer.clear();
-        io::stdin()
-            .read_line(buffer)
-            .expect("Failed  to read input");
-        let Some(movement) = buffer
-            .trim()
-            .parse::<u8>()
-            .ok()
-            .filter(|value| matches!(value, 0 | 1))
-            .map(|value| {
-                if value == 0 {
-                    MovementMode::Absolute
-                } else {
-                    MovementMode::Relative
-                }
-            })
-        else {
-            eprintln!("Invalid input, returning to position reading");
-            continue;
-        };
-
-        // Request the velocity to move at, move at normal velocity on failure
-        println!("Enter velocity: ");
-        buffer.clear();
-        io::stdin().read_line(buffer).expect("Failed to read input");
-        let Ok(velocity) = buffer.trim().parse::<u32>() else {
-            println!("Failed to read velocity, using default.");
-            if let Err(error) = servo.move_position(position, movement).await {
-                eprintln!("Failed to move servo: {error:?}");
-            }
-            break;
-        };
-
-        // Request the acceleration, move at default acceleration and deceleration on failure
-        println!("Enter acceleration: ");
-        buffer.clear();
-        let Ok(acceleration) = buffer.trim().parse::<u32>() else {
-            println!("Failed to read acceleration, using default.");
-            if let Err(error) = servo
-                .move_position_velocity(position, velocity, movement)
-                .await
-            {
-                eprintln!("Failed to move servo: {error:?}");
-            }
-            break;
-        };
-
-        // Request the deceleration, move at default acceleration and deceleration on failure
-        let Ok(deceleration) = buffer.trim().parse::<u32>() else {
-            eprintln!("Failed to read deceleration, using default acceleration and deceleration.");
-            if let Err(error) = servo
-                .move_position_velocity(position, velocity, movement)
-                .await
-            {
-                eprintln!("Failed to move servo: {error:?}");
-            }
-            break;
-        };
-
-        // Move as requested
-        if let Err(error) = servo
-            .move_position_velocity_acceleration(
-                position,
-                velocity,
-                acceleration,
-                deceleration,
-                movement,
-            )
-            .await
-        {
-            eprintln!("Failed to move servo: {error:?}");
-        }
-        break;
-    }
-}
-
-async fn perform_action<const MAX_DEVICES: usize, const PDI_LENGTH: usize>(
-    servo: &mut Servo<'_, '_, MAX_DEVICES, PDI_LENGTH>,
-    action: u8,
-    buffer: &mut String,
-) {
-    // Perform the specified movement with required error handling
-    match action {
-        0 => servo.jog_stop().await,
-        1 => {
-            if let Err(error) = servo.jog_negative().await {
-                eprintln!("Failed to jog negative: {error:?}")
-            }
-        }
-        2 => {
-            if let Err(error) = servo.jog_positive().await {
-                eprintln!("Failed to jog positive: {error:?}")
-            }
-        }
-        3 => {
-            if let Err(error) = servo.home(false).await {
-                eprintln!("Failed to move home: {error:?}")
-            }
-        }
-        4 => perform_movement(servo, buffer).await,
-        _ => println!("Invalid option, try again"),
-    }
-}
-
 fn main() {
     // Parse the arguments
     let args = Args::parse();
-    simple_logger::init().unwrap();
 
     // Create a new single threaded runtime
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -209,7 +80,7 @@ fn main() {
             &args.interface,
             Duration::from_millis(20),
             &PDU_STORAGE,
-            true,
+            false,
         )
         .await
         .expect("Failed to initialize controller");
@@ -239,42 +110,6 @@ fn main() {
             .unwrap();
         loop {
             spin_loop();
-        }
-
-        // Create an input buffer
-        let mut buffer = String::new();
-        loop {
-            // Read the movement action
-            println!("Possible movements:");
-            println!(" 0. Jog stop");
-            println!(" 1. Jog negative");
-            println!(" 2. Jog negative");
-            println!(" 3. Home");
-            println!(" 4. Move");
-            println!("Enter the number for the movement for the servo to make:");
-            buffer.clear();
-            static WAITING_FOR_INPUT: AtomicBool = AtomicBool::new(false);
-            WAITING_FOR_INPUT.store(true, Ordering::Relaxed);
-            let task = tokio::spawn({
-                let controller = controller.clone();
-                async move {
-                    while WAITING_FOR_INPUT.load(Ordering::Relaxed) {
-                        controller.cycle().await;
-                    }
-                }
-            });
-            io::stdin()
-                .read_line(&mut buffer)
-                .expect("Failed to read input");
-            WAITING_FOR_INPUT.store(false, Ordering::Relaxed);
-            task.await.unwrap();
-
-            // Parse the movement code
-            let Ok(selection) = buffer.trim().parse::<u8>() else {
-                println!("Make sure to enter the number next to the movement you want.");
-                continue;
-            };
-            perform_action(&mut servo, selection, &mut buffer).await;
         }
     });
 }
