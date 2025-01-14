@@ -238,10 +238,12 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
             log::info!("Starting Ethercat Master");
         }
 
-        // Initialize SOEM, bind socket to `interface_name`
+        // Create loop for sending and receiving the pdu's
         let (tx, rx, pdu_loop) = pdu_storage
             .try_split()
             .map_err(|()| ControllerError::AnotherControllerExists)?;
+
+        // Initialize the main device (the device the application is running on)
         let main_device = MainDevice::new(
             pdu_loop,
             ethercrab::Timeouts {
@@ -252,6 +254,7 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
             MainDeviceConfig::default(),
         );
 
+        // Create a task for receiving and sending messages and put it on another task
         let update_task =
             tx_rx_task(interface_name, tx, rx).map_err(ControllerError::FailedToSpawnUpdateTask)?;
         #[cfg(feature = "tokio")]
@@ -259,6 +262,7 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
         #[cfg(feature = "smol")]
         smol::spawn(update_task).detach();
 
+        // Initialize the devices as a single group
         let mut group = main_device
             .init_single_group::<MAX_DEVICES, PDI_LENGTH>(ethercat_now)
             .await
@@ -268,8 +272,10 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
             log::info!("Context initialization on {interface_name:?} succeeded.");
         }
 
+        // Configure the device
         Self::configure_devices(&mut group, &main_device, cycle_time, verbose).await?;
 
+        // Wait for the group to connect
         let group = Box::pin(group.into_op(&main_device))
             .await
             .map_err(ControllerError::FailedToMakeGroupOperational)?;
@@ -286,15 +292,23 @@ impl<const MAX_DEVICES: usize, const PDI_LENGTH: usize> Controller<'_, MAX_DEVIC
     /// If the update takes shorter than the specified time, the thread will sleep.
     /// If the update takes longer, a warning message will be displayed.
     pub async fn cycle(&self) {
+        // Start measuring time
         let start = Instant::now();
+
+        // Synchronize with the other devices
         let _ = self.group.tx_rx_sync_system_time(&self.main_device).await;
+
+        // Store the time spend on updating the task
         let delta = start.elapsed();
+
+        // Log a warning message if the update took to long
         if delta > self.cycle_time {
-            log::info!(
+            log::warn!(
                 "System too slow for cycle time {:?} sending takes {delta:?}",
                 self.cycle_time
             );
         } else {
+            // Wait until the the update duration has passed
             let sleep_duration = self.cycle_time - delta;
             #[cfg(feature = "tokio")]
             tokio::time::sleep(sleep_duration).await;

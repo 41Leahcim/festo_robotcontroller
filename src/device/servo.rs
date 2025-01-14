@@ -174,11 +174,14 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         /// The address of the actual current position
         const POSITION_ACTUAL_VALUE_ADDRESS: usize = 3;
 
+        // Select the device
         let sub_device = self
             .0
             .controller
             .group()
             .subdevice(self.0.controller.main_device(), self.0.id)?;
+
+        // Read the position as an u32
         Ok(sub_device
             .inputs_raw()
             .iter()
@@ -200,10 +203,14 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         if !self.0.ready_state() {
             return Err(HomingError::DeviceDisabled(self.0.id));
         }
+
+        // Set the device to the homing mode
         self.0
             .set_mode(OperationMode::Homing)
             .await
             .map_err(HomingError::SetMode)?;
+
+        // Display a warning, if the device is already homed and the device shouldn't always home.
         if self.0.get_bit(
             StatusWordBit::DriveHomed as u8,
             MappedPdo::ControlStatusWord,
@@ -212,15 +219,20 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             log::info!("device already homed");
         } else {
             log::info!("device {} starting homing", self.0.id);
+            // Clear the control bits, but set control bit 4
             self.0.unset_control();
             self.0
                 .set_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
+
+            // Wait until the device is homed
             while !self.0.get_bit(
                 StatusWordBit::AckStartRefReached as u8,
                 MappedPdo::ControlStatusWord,
             ) {
                 self.0.controller.cycle().await;
             }
+
+            // Clear the bit
             self.0
                 .unset_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
         }
@@ -237,17 +249,25 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         if !self.0.ready_state() {
             return Err(JoggingError::DeviceDisabled(self.0.id));
         }
+
+        // Set the jogging mode
         self.0
             .set_mode(OperationMode::Jog)
             .await
             .map_err(JoggingError::SetMode)?;
+
+        // Clear the control bits
         self.0.unset_control();
+
+        // Wait until the previous motion has completed
         while !self.0.get_bit(
             StatusWordBit::MotionComplete as u8,
             MappedPdo::ControlStatusWord,
         ) {
             self.0.controller.cycle().await;
         }
+
+        // Set the jogging direction
         self.0.set_bit(
             match direction {
                 JoggingDirection::Positive => ControlBit::Control4,
@@ -289,10 +309,15 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         if self.0.controller.verbose() {
             log::info!("Stopping jog movement");
         }
+        // Return if the device isn't operational
         if !self.0.ready_state() {
             return;
         }
+
+        // Clear the control bits
         self.0.unset_control();
+
+        // Wait until the motion is complete
         while !self.0.get_bit(
             StatusWordBit::MotionComplete as u8,
             MappedPdo::ControlStatusWord,
@@ -336,28 +361,45 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         if !self.0.ready_state() {
             return Err(MovementError::DriveDisabled(self.0.id));
         }
+        // Set the direction to move in
         self.0
             .set_mode(OperationMode::ProfilePosition)
             .await
             .map_err(MovementError::SetMode)?;
+
+        // Clear the control bits
         self.0.unset_control();
+
+        // Set control bit 6 if the motion has to be relative to the current positon
         if movement == MovementMode::Relative {
             self.0
                 .set_bit(ControlBit::Control6 as u8, MappedPdo::ControlStatusWord);
         }
+
+        // Set the position to the requested value
         self.set_position(target, 3)
             .map_err(MovementError::Ethercat)?;
+
+        // Perform an update cycle
         self.0.controller.cycle().await;
+
+        // Clear the halt bit
         self.0
             .unset_bit(ControlBit::Halt as u8, MappedPdo::ControlStatusWord);
+
+        // Set control bit 4
         self.0
             .set_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
+
+        // Wait until the requested position has been reached
         while !self.0.get_bit(
             StatusWordBit::AckStartRefReached as u8,
             MappedPdo::ControlStatusWord,
         ) {
             self.0.controller.cycle().await;
         }
+
+        // Wait until the motion is complete
         while !self.0.get_bit(
             StatusWordBit::MotionComplete as u8,
             MappedPdo::ControlStatusWord,
@@ -369,6 +411,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
                     self.get_position().map_err(MovementError::Ethercat)?
                 );
             }
+
+            //  Clear the control bits
             self.0.unset_control();
             self.0.controller.cycle().await;
         }
@@ -392,8 +436,11 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         velocity: u32,
         movement: MovementMode,
     ) -> Result<(), MovementError> {
+        // Set the profile velocity
         self.set_profile_velocity(velocity, MappedPdo::ProfileVelocity)
             .map_err(MovementError::Ethercat)?;
+
+        // Move to the requested position
         self.move_position(target, movement).await
     }
 
@@ -418,18 +465,23 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         movement: MovementMode,
     ) -> Result<(), FullControlMovementError> {
         {
+            // Select the requested device
             let sub_device = self
                 .0
                 .controller
                 .group()
                 .subdevice(self.0.controller.main_device(), self.0.id)
                 .map_err(FullControlMovementError::DeviceInUse)?;
+
+            // Set the requested acceleration
             sub_device
                 .sdo_write(0x6083, 0, acceleration)
                 .await
                 .map_err(|error| {
                     FullControlMovementError::WritingAccelerationFailed(self.0.id, error)
                 })?;
+
+            // Set the requested deceleration
             sub_device
                 .sdo_write(0x6084, 0, deceleration)
                 .await
@@ -437,6 +489,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
                     FullControlMovementError::WritingDecelerationFailed(self.0.id, error)
                 })?;
         }
+
+        // Move to the requested position with the requested velocity
         self.move_position_velocity(target, velocity, movement)
             .await
             .map_err(FullControlMovementError::MovementFailed)
@@ -448,11 +502,14 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     )]
     /// Set the servo position to the requested value.
     fn set_position(&mut self, target: i32, byte: u8) -> Result<(), EthercrabError> {
+        // Select the device
         let mut sub_device = self
             .0
             .controller
             .group()
             .subdevice(self.0.controller.main_device(), self.0.id)?;
+
+        // Set the positon bit to the requested value
         let byte = usize::from(byte);
         sub_device.outputs_raw_mut()[byte..byte + size_of::<i32>()]
             .copy_from_slice(&target.to_le_bytes());
@@ -472,11 +529,14 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         velocity: u32,
         byte: MappedPdo,
     ) -> Result<(), EthercrabError> {
+        // Select the device
         let mut sub_device = self
             .0
             .controller
             .group()
             .subdevice(self.0.controller.main_device(), self.0.id)?;
+
+        // Set the requested profile velocity
         sub_device.outputs_raw_mut()[byte as usize..].copy_from_slice(&velocity.to_le_bytes());
         Ok(())
     }

@@ -289,11 +289,17 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         if controller.verbose() {
             log::info!("Start enabling drive {device_number}");
         }
+
+        // Create a device instance
         let mut result = Self {
             id: device_number,
             controller,
         };
+
+        // Reset the device
         result.reset().await.map_err(EnableError::ResetFailed)?;
+
+        // Enable the voltage while making sure the device is in quickstop mode
         let mut timeout = 1_000_000;
         while !(result.get_bit(
             StatusWordBit::VoltageEnabled as u8,
@@ -309,7 +315,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             controller.cycle().await;
             timeout -= 1;
         }
-        eprintln!("Enable voltage is on");
+
+        // Turn the device on and enable operation
         while !(result.get_bit(
             StatusWordBit::OperationEnabled as u8,
             MappedPdo::ControlStatusWord,
@@ -326,7 +333,9 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             result.set_bit(ControlBit::SwitchOn as u8, MappedPdo::ControlStatusWord);
             controller.cycle().await;
         }
-        eprintln!("Device turned on");
+
+        // Return the device if the voltage is still enabled, stopped, and operational.
+        // Return an error otherwise.
         if result.get_bit(
             StatusWordBit::VoltageEnabled as u8,
             MappedPdo::ControlStatusWord,
@@ -360,6 +369,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         if self.controller.verbose() {
             log::info!("Resetting device number: {}", self.id);
         }
+
+        // Set the outputs of the device to 0.
         self.controller
             .group()
             .subdevice(self.controller.main_device(), self.id)
@@ -367,11 +378,13 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             .outputs_raw_mut()
             .fill(0);
 
+        // Wait a cycle so inputs and outputs can be send
         if self.controller.verbose() {
             log::info!("Wait for empty frame device number: {}", self.id);
         }
         self.controller.cycle().await;
 
+        // Reset the device while there is an error
         let mut retries = 1000;
         while self.get_error() != DeviceError::Ok && retries > 0 {
             retries -= 1;
@@ -382,8 +395,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             self.controller.cycle().await;
             self.unset_bit(ControlBit::FaultReset as u8, MappedPdo::ControlStatusWord);
         }
-        eprintln!("Device OK");
 
+        // Check whether the fault or warning bit is set, return an error if so
         match (
             self.get_bit(StatusWordBit::Fault as u8, MappedPdo::ControlStatusWord),
             &&self.get_bit(StatusWordBit::Warning as u8, MappedPdo::ControlStatusWord),
@@ -413,6 +426,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         reason = "Mutable reference is used to decrease the chance of having multiple SubDevice refs at a time"
     )]
     fn set_bit(&mut self, mut bit: u8, byte: MappedPdo) -> u8 {
+        // Select the device
         let Ok(mut sub_device) = self
             .controller
             .group()
@@ -420,8 +434,12 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         else {
             return 0;
         };
+
+        // Calculate the correct byte and bit
         let byte = (byte as usize + usize::from(bit / 8)) % sub_device.outputs_raw().len();
         bit %= 8;
+
+        // Set the requested bit and return the new value of that byte
         let outputs = sub_device.outputs_raw_mut();
         outputs[byte] |= 1 << bit;
         outputs[byte]
@@ -440,6 +458,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         reason = "Mutable reference is used to decrease the chance of having multiple SubDevice refs at a time"
     )]
     fn unset_bit(&mut self, mut bit: u8, byte: MappedPdo) -> u8 {
+        // Select the device
         let Ok(mut sub_device) = self
             .controller
             .group()
@@ -447,9 +466,12 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         else {
             return 0;
         };
+
+        // Calculate the correct byte and bit
         let byte = (byte as usize + usize::from(bit / 8)) % sub_device.outputs_raw().len();
         bit %= 8;
 
+        // Clear the requested bit and return the new value of that byte
         let outputs = sub_device.outputs_raw_mut();
         outputs[byte] &= !(1 << bit);
         outputs[byte]
@@ -468,6 +490,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// # Returns
     /// The value of the requested bit
     fn get_bit(&mut self, mut bit: u8, byte: MappedPdo) -> bool {
+        // Select the device
         let Ok(sub_device) = self
             .controller
             .group()
@@ -475,8 +498,12 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         else {
             return false;
         };
+
+        // Calculate the correct byte and bit
         let byte = (byte as usize + usize::from(bit / 8)) % sub_device.inputs_raw().len();
         bit %= 8;
+
+        // Read and return the requested bit of the requested byte
         (sub_device.inputs_raw()[byte] & (1 << bit)) != 0
     }
 
@@ -485,6 +512,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// # Returns
     /// Whether the device is currently enabled for operation
     fn ready_state(&mut self) -> bool {
+        // Check and return whether operation is enabled
         self.get_bit(
             StatusWordBit::OperationEnabled as u8,
             MappedPdo::ControlStatusWord,
@@ -496,10 +524,13 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// # Returns
     /// Returns the new value of the control bytes
     fn unset_control(&mut self) -> u16 {
+        // Clear the control bits and store the bytes
         self.unset_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
         self.unset_bit(ControlBit::Control5 as u8, MappedPdo::ControlStatusWord);
         let byte0 = self.unset_bit(ControlBit::Control6 as u8, MappedPdo::ControlStatusWord);
         let byte1 = self.unset_bit(ControlBit::Control9 as u8, MappedPdo::ControlStatusWord);
+
+        // Return the bytes as a single unsigned 16-bit integer
         (u16::from(byte1) << 8) | u16::from(byte0)
     }
 
@@ -508,6 +539,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// # Returns
     /// Returns whether the device is in warning, fault, fault + warning, or ok
     pub fn get_error(&mut self) -> DeviceError {
+        // Check whether the fault or warning bit is set and return the correct error
         match (
             self.get_bit(StatusWordBit::Fault as u8, MappedPdo::ControlStatusWord),
             self.get_bit(StatusWordBit::Warning as u8, MappedPdo::ControlStatusWord),
@@ -530,10 +562,13 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// # Returns
     /// Returns the 2 read bytes or an error
     pub fn get_16(&mut self, byte: u8) -> Result<u16, EthercrabError> {
+        // Select the device
         let sub_device = self
             .controller
             .group()
             .subdevice(self.controller.main_device(), self.id)?;
+
+        // Take the current requested bytes of inputs
         let inputs = sub_device.inputs_raw();
         let byte = usize::from(byte);
         Ok(u16::from(inputs[byte]) | (u16::from(inputs[byte + 1]) << 8))
@@ -560,16 +595,25 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
                 })
         {
             timeout -= 1;
+
+            // Clear the control bits
             self.unset_control();
+
+            // Take the requested device
             if let Ok(mut sub_device) = self
                 .controller
                 .group()
                 .subdevice(self.controller.main_device(), self.id)
             {
+                // Set the requested mode
                 sub_device.outputs_raw_mut()[MappedPdo::OperationMode as usize] = mode as u8;
             }
+
+            // Execute an update cycle
             self.controller.cycle().await;
         }
+
+        // Select the device
         if self
             .controller
             .group()
@@ -580,6 +624,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         {
             return Err(SetModeError(self.id, mode));
         }
+
+        // Clear the control bits
         self.unset_control();
         if self.controller.verbose() {
             log::info!("Arrived in mode {mode:?}");
@@ -592,18 +638,26 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
     /// # Errors
     /// Returns an error if the device didn't get disabled.
     pub async fn disable(mut self) -> Result<(), Timeout> {
+        // Clear the enable operation bit to disable operation
         self.unset_bit(
             ControlBit::EnableOperation as u8,
             MappedPdo::ControlStatusWord,
         );
+
+        // Clear the switch on bit to turn the device off
         self.unset_bit(ControlBit::SwitchOn as u8, MappedPdo::ControlStatusWord);
+
+        // Perform an update cycle
         self.controller.cycle().await;
+
+        // Disable the quick stop and disable the voltage
         self.unset_bit(ControlBit::QuickStop as u8, MappedPdo::ControlStatusWord);
         self.unset_bit(
             ControlBit::EnableVoltage as u8,
             MappedPdo::ControlStatusWord,
         );
 
+        // Wait until the device is disabled
         let mut timeout = 1_000;
         while self.get_bit(
             StatusWordBit::OperationEnabled as u8,
@@ -613,6 +667,8 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             timeout -= 1;
             self.controller.cycle().await;
         }
+
+        // Return an error on timeout
         if timeout == 0 {
             Err(Timeout)
         } else {
