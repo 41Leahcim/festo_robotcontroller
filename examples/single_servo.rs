@@ -14,7 +14,7 @@ pub struct Args {
     /// The interface to communicate over
     interface: String,
 
-    #[arg(short)]
+    #[arg(short = 'n')]
     device_number: Option<usize>,
 
     #[arg(short)]
