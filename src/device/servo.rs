@@ -539,7 +539,9 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             .subdevice(self.0.controller.main_device(), self.0.id)?;
 
         // Set the requested profile velocity
-        sub_device.outputs_raw_mut()[byte as usize..].copy_from_slice(&velocity.to_le_bytes());
+        let byte = byte as usize;
+        sub_device.outputs_raw_mut()[byte..byte + size_of::<u32>()]
+            .copy_from_slice(&velocity.to_le_bytes());
         Ok(())
     }
 }
