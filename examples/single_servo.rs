@@ -133,7 +133,7 @@ fn main() {
 
         // Move the motor in the negative direction
         servo
-            .move_position(-10_000, MovementMode::Absolute)
+            .move_position(-1_000, MovementMode::Absolute)
             .await
             .unwrap();
 
