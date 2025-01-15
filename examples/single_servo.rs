@@ -122,18 +122,21 @@ fn main() {
 
         // Move the motor to the home position
         servo.home(true).await.unwrap();
+        eprintln!("Homed");
 
         // Move the motor in the positive direction
         servo
             .move_position(1_000_000, MovementMode::Absolute)
             .await
             .unwrap();
+        eprintln!("Moved");
 
         // Move the motor back to 0
         servo
             .move_position(0, MovementMode::Absolute)
             .await
             .unwrap();
+        eprintln!("Returned");
 
         println!("Program finished");
         loop {
