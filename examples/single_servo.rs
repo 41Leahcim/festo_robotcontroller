@@ -126,7 +126,7 @@ fn main() {
 
         // Move the motor in the positive direction
         servo
-            .move_position_velocity(200_000, 100, MovementMode::Absolute)
+            .move_position_velocity(190_000, 100, MovementMode::Absolute)
             .await
             .unwrap();
         eprintln!("Moved");
@@ -144,9 +144,6 @@ fn main() {
             .unwrap();
         eprintln!("Returned");
 
-        println!("Program finished");
-        loop {
-            controller.cycle().await;
-        }
+        servo.disable().await.unwrap();
     });
 }
