@@ -163,6 +163,7 @@ fn main() {
         while jog_start.elapsed().as_secs() < 4 {
             controller.cycle().await;
         }
+        servo.jog_stop().await;
 
         servo.disable().await.unwrap();
     });
