@@ -7,7 +7,10 @@ use festo_robotcontroller::{
     controller::Controller,
     device::servo::{MovementMode, Servo},
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 /// This will store the PDU messages until sent
 static PDU_STORAGE: PduStorage<16, 1100> = PduStorage::new();
@@ -148,12 +151,18 @@ fn main() {
         // Jog in positive direction
         eprintln!("Jogging in positive direction");
         servo.jog_positive().await.unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        let mut jog_start = Instant::now();
+        while jog_start.elapsed().as_secs() < 1 {
+            controller.cycle().await;
+        }
 
         // Jog back
+        jog_start = Instant::now();
         eprintln!("Jogging in negative direction");
         servo.jog_negative().await.unwrap();
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        while jog_start.elapsed().as_secs() < 1 {
+            controller.cycle().await;
+        }
 
         servo.disable().await.unwrap();
     });
