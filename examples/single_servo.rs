@@ -152,7 +152,7 @@ fn main() {
         eprintln!("Jogging in positive direction");
         servo.jog_positive().await.unwrap();
         let mut jog_start = Instant::now();
-        while jog_start.elapsed().as_secs() < 1 {
+        while jog_start.elapsed().as_secs() < 4 {
             controller.cycle().await;
         }
 
@@ -160,7 +160,7 @@ fn main() {
         jog_start = Instant::now();
         eprintln!("Jogging in negative direction");
         servo.jog_negative().await.unwrap();
-        while jog_start.elapsed().as_secs() < 1 {
+        while jog_start.elapsed().as_secs() < 4 {
             controller.cycle().await;
         }
 
