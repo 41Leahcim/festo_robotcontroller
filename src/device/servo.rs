@@ -209,7 +209,6 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             .set_mode(OperationMode::Homing)
             .await
             .map_err(HomingError::SetMode)?;
-        eprintln!("Set homing mode");
 
         // Display a warning, if the device is already homed and the device shouldn't always home.
         if self.0.get_bit(
@@ -224,7 +223,6 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             self.0.unset_control();
             self.0
                 .set_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
-            eprintln!("Started homing");
 
             // Wait until the device is homed
             while !self.0.get_bit(
@@ -233,7 +231,6 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             ) {
                 self.0.controller.cycle().await;
             }
-            eprintln!("Homed");
 
             // Clear the bit
             self.0
@@ -394,6 +391,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         self.0
             .set_bit(ControlBit::Control4 as u8, MappedPdo::ControlStatusWord);
 
+        eprintln!("Waiting for ACK start");
         // Wait until the requested position has been reached
         while !self.0.get_bit(
             StatusWordBit::AckStartRefReached as u8,
@@ -402,6 +400,7 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
             self.0.controller.cycle().await;
         }
 
+        eprintln!("Waiting until motion complete");
         // Wait until the motion is complete
         while !self.0.get_bit(
             StatusWordBit::MotionComplete as u8,
