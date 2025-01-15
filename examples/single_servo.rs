@@ -7,7 +7,7 @@ use festo_robotcontroller::{
     controller::Controller,
     device::servo::{MovementMode, Servo},
 };
-use std::{hint::spin_loop, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 /// This will store the PDU messages until sent
 static PDU_STORAGE: PduStorage<16, 1100> = PduStorage::new();
@@ -139,9 +139,8 @@ fn main() {
         eprintln!("Returned");
 
         println!("Program finished");
-        servo.disable().await.unwrap();
         loop {
-            spin_loop();
+            controller.cycle().await;
         }
     });
 }
