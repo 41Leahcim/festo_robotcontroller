@@ -121,28 +121,39 @@ fn main() {
             .expect("Failed to initialize device");
 
         // Move the motor to the home position
+        eprintln!("Homing");
         servo.home(true).await.unwrap();
-        eprintln!("Homed");
 
         // Move the motor in the positive direction
+        eprintln!("Moving in positive direction");
         servo
             .move_position_velocity(190_000, 100, MovementMode::Absolute)
             .await
             .unwrap();
-        eprintln!("Moved");
 
         // Move the motor in the negative direction
+        eprintln!("Moving in negative direction");
         servo
             .move_position(-1_000, MovementMode::Absolute)
             .await
             .unwrap();
 
         // Move the motor back to 0
+        eprintln!("Moving to 0 position");
         servo
             .move_position(0, MovementMode::Absolute)
             .await
             .unwrap();
-        eprintln!("Returned");
+
+        // Jog in positive direction
+        eprintln!("Jogging in positive direction");
+        servo.jog_positive().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        // Jog back
+        eprintln!("Jogging in negative direction");
+        servo.jog_negative().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         servo.disable().await.unwrap();
     });
