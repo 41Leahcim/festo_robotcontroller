@@ -130,7 +130,7 @@ fn main() {
         // Move the motor in the positive direction
         eprintln!("Moving in positive direction");
         servo
-            .move_position_velocity(190_000, 100, MovementMode::Absolute)
+            .move_position_velocity_acceleration(190_000, 100, 10, 10, MovementMode::Absolute)
             .await
             .unwrap();
 
