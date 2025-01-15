@@ -125,7 +125,7 @@ fn main() {
 
         // Move the motor in the positive direction
         servo
-            .move_position(500_000, MovementMode::Absolute)
+            .move_position(1_000_000, MovementMode::Absolute)
             .await
             .unwrap();
 
