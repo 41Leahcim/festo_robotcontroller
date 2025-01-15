@@ -1,7 +1,7 @@
 //! This module contains everything related to the `Servo` drive struct.
 //! The `Servo` drive struct can control Servo's controlled by most Festo Servomotor drives.
 
-use super::{Device, EnableError, OperationMode, SetModeError, StatusWordBit};
+use super::{Device, EnableError, OperationMode, SetModeError, StatusWordBit, Timeout};
 use crate::{
     controller::Controller,
     device::{ControlBit, MappedPdo},
@@ -543,5 +543,13 @@ impl<'device, 'controller: 'device, const MAX_DEVICES: usize, const PDI_LENGTH: 
         sub_device.outputs_raw_mut()[byte..byte + size_of::<u32>()]
             .copy_from_slice(&velocity.to_le_bytes());
         Ok(())
+    }
+
+    /// Disables the device after use.
+    ///
+    /// # Errors
+    /// Returns an error if the device didn't get disabled.
+    pub async fn disable(self) -> Result<(), Timeout> {
+        self.0.disable().await
     }
 }

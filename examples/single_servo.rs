@@ -139,6 +139,7 @@ fn main() {
         eprintln!("Returned");
 
         println!("Program finished");
+        servo.disable().await.unwrap();
         loop {
             spin_loop();
         }

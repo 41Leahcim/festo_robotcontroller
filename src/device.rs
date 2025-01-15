@@ -252,6 +252,7 @@ enum MappedPdo {
 }
 
 /// A timeout happened
+#[derive(Debug)]
 pub struct Timeout;
 
 /// A generic device type.
