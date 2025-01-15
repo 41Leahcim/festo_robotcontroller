@@ -125,7 +125,7 @@ fn main() {
 
         // Move the motor in the positive direction
         servo
-            .move_position(100_000, MovementMode::Absolute)
+            .move_position(500_000, MovementMode::Absolute)
             .await
             .unwrap();
 
@@ -134,6 +134,8 @@ fn main() {
             .move_position(0, MovementMode::Absolute)
             .await
             .unwrap();
+
+        println!("Program finished");
         loop {
             spin_loop();
         }
