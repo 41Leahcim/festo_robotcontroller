@@ -13,7 +13,7 @@ use std::{
 };
 
 /// This will store the PDU messages until sent
-static PDU_STORAGE: PduStorage<255, 1100> = PduStorage::new();
+static PDU_STORAGE: PduStorage<128, 1100> = PduStorage::new();
 
 /// This struct parces and stores the arguments passed to the application.
 #[derive(Debug, Parser)]
@@ -103,7 +103,7 @@ fn main() {
     // Start the runtime
     runtime.block_on(async {
         // Create a new controller
-        let mut controller: Controller<'_, 16, 255> = Controller::new(
+        let mut controller: Controller<'_, 16, 128> = Controller::new(
             &args.interface,
             Duration::from_millis(20),
             &PDU_STORAGE,
