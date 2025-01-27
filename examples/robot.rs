@@ -22,11 +22,6 @@ pub struct Args {
     interface: String,
 }
 
-/// Checks whether the left argument is None or contains the same value as the right argument
-fn none_or_equal<T: PartialEq>(left: Option<T>, right: T) -> bool {
-    left.is_none() || left == Some(right)
-}
-
 fn main() {
     // Parse the arguments
     let args = Args::parse();
@@ -40,7 +35,7 @@ fn main() {
     // Start the runtime
     runtime.block_on(async {
         // Create a new controller
-        let mut controller: Controller<'_, 16, 64> = Controller::new(
+        let controller: Controller<'_, 16, 64> = Controller::new(
             &args.interface,
             Duration::from_millis(20),
             &PDU_STORAGE,

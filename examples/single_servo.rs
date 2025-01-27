@@ -13,7 +13,7 @@ use std::{
 };
 
 /// This will store the PDU messages until sent
-static PDU_STORAGE: PduStorage<16, 1100> = PduStorage::new();
+static PDU_STORAGE: PduStorage<256, 1100> = PduStorage::new();
 
 /// This struct parces and stores the arguments passed to the application.
 #[derive(Debug, Parser)]
